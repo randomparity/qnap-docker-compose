@@ -1,0 +1,87 @@
+version: "2.1"
+services:
+  sabnzbd:
+    container_name: sabnzbd
+    environment:
+      - PUID=1001
+      - PGID=1000
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: lscr.io/linuxserver/sabnzbd
+    ports:
+      - 4444:8080
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/sabnzbd:/config
+      - /share/Download/sabnzbd:/download
+      - /share/Backup/sabnzbd:/backup
+
+  radarr:
+    container_name: radarr
+    environment:
+      - PUID=1001
+      - PGID=1000
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: lscr.io/linuxserver/radarr
+    ports:
+      - 7878:7878
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/radarr:/config
+      - /share/Media/movies:/movies
+      - /share/Download/sabnzbd/completed/movies:/download
+
+  sonarr:
+    container_name: sonarr
+    environment:
+      - PUID=1001
+      - PGID=1000
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: lscr.io/linuxserver/sonarr
+    ports:
+      - 8989:8989
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/sonarr:/config
+      - /share/Media/series:/series
+      - /share/Download/sabnzbd/completed/series:/download
+
+  lidarr:
+    container_name: lidarr
+    environment:
+      - PUID=1001
+      - PGID=1000
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: lscr.io/linuxserver/lidarr
+    ports:
+      - 8686:8686
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/lidarr:/config
+      - /share/Media/music:/music
+      - /share/Download/sabnzbd/completed/music:/download
+
+  portainer:
+    command:
+      - -H
+      - unix:///var/run/docker.sock
+    container_name: portainer
+    environment:
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: portainer/portainer-ce
+    ports:
+      - 8000:8000
+      - 9000:9000
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/portainer:/config
+      - /var/run/docker.sock:/var/run/docker.sock
