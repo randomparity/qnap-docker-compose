@@ -1,5 +1,26 @@
 version: "2.1"
 services:
+  channels-dvr:
+    container_name: channels-dvr
+    devices:
+      - /dev/dri:/dev/dri
+    hostname: cineplex
+    image: fancybits/channels-dvr:latest
+    # By using bridge networking we give up mDNS
+    # network_mode: host
+    ports:
+      # Channels-DVR enables mDNS by default so that client apps can find
+      # the server automagically.  We're specifically disabling Zeroconf
+      # so all clients need to manually set an IP address to access the 
+      # server.
+      # - "5353:5353/udp" # (Bonjour/Avahi/Zeroconf network discovery)
+      - "8089:8089"
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/channels-dvr:/channels-dvr
+      - /share/Media/video:/shares/DVR
+
   prowlarr:
     container_name: prowlarr
     environment:
@@ -12,8 +33,8 @@ services:
       - 9696:9696
     restart: unless-stopped
     volumes:
-    - /etc/localtime:/etc/localtime:ro
-    - /share/Container/prowlarr:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/prowlarr:/config
 
   makemkv:
     container_name: makemkv
@@ -27,10 +48,10 @@ services:
       - 5800:5800
     restart: unless-stopped
     volumes:
-    - /etc/localtime:/etc/localtime:ro
-    - /share/Container/makemkv:/config
-    - /share/Media:/media
-    - /share/Download/sabnzbd/completed:/download
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/makemkv:/config
+      - /share/Media:/media
+      - /share/Download/sabnzbd/completed:/download
 
 #  recyclarr:
 #    container_name: recyclarr
@@ -162,3 +183,4 @@ services:
       - /share/Media/movies:/movies:ro
       - /share/Media/music:/music:ro
       - /share/Media/series:/series:ro
+      - /share/Media/video:/video:ro
