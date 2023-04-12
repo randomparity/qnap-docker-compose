@@ -159,6 +159,6 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /share/Backup/plex:/backup
       - /share/Container/plex:/config
-      - /share/Media/movies:/movies
-      - /share/Media/music:/music
-      - /share/Media/series:/series
+      - /share/Media/movies:/movies:ro
+      - /share/Media/music:/music:ro
+      - /share/Media/series:/series:ro
