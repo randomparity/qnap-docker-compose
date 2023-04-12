@@ -1,5 +1,22 @@
 version: "2.1"
 services:
+  # Needs changes to your DHCP server to work correctly.
+  # See https://hub.docker.com/r/linuxserver/netbootxyz
+  netbootxyz:
+    container_name: netbootxyz
+    environment:
+      - PUID=1001
+      - PGID=1000
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: lscr.io/linuxserver/netbootxyz:latest
+    ports:
+      - 69:69/udp
+      - 3000:3000
+    restart: unless-stopped
+    volumes:
+      - /share/Container/netbootxyz:/config
+
   tautulli:
     container_name: tautulli
     environment:
