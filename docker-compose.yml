@@ -1,5 +1,21 @@
 version: "2.1"
 services:
+  tautulli:
+    container_name: tautulli
+    environment:
+      - PUID=1001
+      - PGID=1000
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: lscr.io/linuxserver/tautulli
+    ports:
+      - "8181:8181"
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /share/Container/tautulli:/config
+      - /share/Container/plex/Library/Application Support/Plex Media Server/Logs:/logs
+
   channels-dvr:
     container_name: channels-dvr
     devices:
