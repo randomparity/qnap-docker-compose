@@ -15,6 +15,23 @@ services:
     - /etc/localtime:/etc/localtime:ro
     - /share/Container/prowlarr:/config
 
+  makemkv:
+    container_name: makemkv
+    environment:
+      - USER_ID=1000
+      - GROUP_ID=1001
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: jlesage/makemkv
+    ports:
+      - 5800:5800
+    restart: unless-stopped
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - /share/Container/makemkv:/config
+    - /share/Media:/media
+    - /share/Download/sabnzbd/completed:/download
+
 #  recyclarr:
 #    container_name: recyclarr
 #    environment:
