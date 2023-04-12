@@ -1,5 +1,33 @@
 version: "2.1"
 services:
+  prowlarr:
+    container_name: prowlarr
+    environment:
+      - PUID=1001
+      - PGID=1000
+      - TZ=America/Los_Angeles
+    hostname: cineplex
+    image: lscr.io/linuxserver/prowlarr
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - /share/Container/prowlarr:/config
+
+#  recyclarr:
+#    container_name: recyclarr
+#    environment:
+#      - TZ=America/Los_Angeles
+#      - RECYCLARR_CREATE_CONFIG=true
+#    hostname: cineplex
+#    image: lscr.io/recyclarr/recyclarr
+#    restart: unless-stopped
+#    user: 1001:1000
+#    volumes:
+#    - /etc/localtime:/etc/localtime:ro
+#    - /share/Container/recyclarr:/config
+
   sabnzbd:
     container_name: sabnzbd
     environment:
