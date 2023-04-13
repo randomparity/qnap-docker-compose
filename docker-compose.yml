@@ -15,6 +15,7 @@ services:
       - 3000:3000
     restart: unless-stopped
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - /share/Container/netbootxyz:/config
 
   tautulli:
@@ -53,6 +54,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /share/Container/channels-dvr:/channels-dvr
       - /share/Media/video:/shares/DVR
+      - /share/Media/movies:/shares/movies:ro
+      - /share/Media/series:/shares/series:ro
 
   prowlarr:
     container_name: prowlarr
@@ -186,6 +189,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
   plex:
+    # https://hub.docker.com/r/plexinc/pms-docker/
+    # How to claim the Plex server using SSH port forwarding:
+    # ssh user@nas -L 32400:127.0.0.1:32400 -N
+    # http://localhost:32400/web
     container_name: plex
     devices:
       - /dev/dri:/dev/dri
