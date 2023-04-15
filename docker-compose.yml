@@ -31,6 +31,7 @@ services:
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
+      - /share/Backup/tautulli:/backup
       - /share/Container/tautulli:/config
       - /share/Container/plex/Library/Application Support/Plex Media Server/Logs:/logs
 
