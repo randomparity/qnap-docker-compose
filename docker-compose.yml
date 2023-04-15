@@ -132,9 +132,10 @@ services:
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
+      - /share/Backup/radarr:/backup
       - /share/Container/radarr:/config
       - /share/Media/movies:/movies
-      - /share/Download/sabnzbd/completed/movies:/download
+      - /share/Download/sabnzbd:/download
 
   sonarr:
     container_name: sonarr
@@ -149,9 +150,10 @@ services:
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
+      - /share/Backup/sonarr:/backup
       - /share/Container/sonarr:/config
       - /share/Media/series:/series
-      - /share/Download/sabnzbd/completed/series:/download
+      - /share/Download/sabnzbd:/download
 
   lidarr:
     container_name: lidarr
@@ -166,9 +168,10 @@ services:
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
+      - /share/Backup/lidarr:/backup
       - /share/Container/lidarr:/config
       - /share/Media/music:/music
-      - /share/Download/sabnzbd/completed/music:/download
+      - /share/Download/sabnzbd:/download
 
   portainer:
     command:
