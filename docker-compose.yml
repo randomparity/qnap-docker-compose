@@ -31,8 +31,8 @@ services:
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Backup/tautulli:/backup
       - /share/Container/tautulli:/config
+      - /share/Backup/tautulli:/config/backups
       - /share/Container/plex/Library/Application Support/Plex Media Server/Logs:/logs
 
   channels-dvr:
@@ -228,3 +228,25 @@ services:
       - /share/Media/music:/music:ro
       - /share/Media/series:/series:ro
       - /share/Media/video:/video:ro
+
+  watchtower:
+    container_name: watchtower
+    environment:
+      REPO_PASS: ""
+      REPO_USER: ""
+      TZ: America/Los_Angeles
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_MONITOR_ONLY: "false"
+      WATCHTOWER_NOTIFICATION_TEMPLATE: '{{range .}}{{.Message}}{{println}}{{end}}'
+      WATCHTOWER_NOTIFICATION_URL: ""
+      WATCHTOWER_NOTIFICATIONS: shoutrrr
+      WATCHTOWER_NOTIFICATIONS_LEVEL: info
+      WATCHTOWER_SCHEDULE: 0 0 4 * * *
+      WATCHTOWER_TIMEOUT: 10s
+    hostname: cineplex
+    image: ghcr.io/containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
