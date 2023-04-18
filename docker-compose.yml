@@ -8,7 +8,7 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: netbootxyz
     image: lscr.io/linuxserver/netbootxyz:latest
     ports:
       - 69:69/udp
@@ -24,7 +24,7 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: tautulli
     image: lscr.io/linuxserver/tautulli
     ports:
       - "8181:8181"
@@ -39,7 +39,7 @@ services:
     container_name: channels-dvr
     devices:
       - /dev/dri:/dev/dri
-    hostname: cineplex
+    hostname: channels-dvr
     image: fancybits/channels-dvr:latest
     # By using bridge networking we give up mDNS
     # network_mode: host
@@ -64,7 +64,7 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: prowlarr
     image: lscr.io/linuxserver/prowlarr
     ports:
       - 9696:9696
@@ -79,7 +79,7 @@ services:
       - USER_ID=1000
       - GROUP_ID=1001
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: makemkv
     image: jlesage/makemkv
     ports:
       - 5800:5800
@@ -95,7 +95,7 @@ services:
 #    environment:
 #      - TZ=America/Los_Angeles
 #      - RECYCLARR_CREATE_CONFIG=true
-#    hostname: cineplex
+#    hostname: recyclarr
 #    image: lscr.io/recyclarr/recyclarr
 #    restart: unless-stopped
 #    user: 1001:1000
@@ -109,7 +109,7 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: sabnzbd
     image: lscr.io/linuxserver/sabnzbd
     ports:
       - 4444:8080
@@ -126,7 +126,7 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: radarr
     image: lscr.io/linuxserver/radarr
     ports:
       - 7878:7878
@@ -144,7 +144,7 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: sonarr
     image: lscr.io/linuxserver/sonarr
     ports:
       - 8989:8989
@@ -162,7 +162,7 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: lidarr
     image: lscr.io/linuxserver/lidarr
     ports:
       - 8686:8686
@@ -181,7 +181,7 @@ services:
     container_name: portainer
     environment:
       - TZ=America/Los_Angeles
-    hostname: cineplex
+    hostname: portainer
     image: portainer/portainer-ce
     ports:
       - 8000:8000
@@ -205,9 +205,12 @@ services:
       - PGID=1000
       - TZ=America/Los_Angeles
       - VERSION=docker
-    hostname: cineplex
+      - ADVERTISE_IP='http://192.168.2.3:32400'
+    hostname: plex
     image: lscr.io/linuxserver/plex
     ports:
+      # Plex is being used in a bridged networking configurarion, need
+      # to specifically advertise ports for use
       # Port listing from Plex website as of 2023-04-11.
       # https://support.plex.tv/articles/201543147-what-network-ports-do-i-need-to-allow-through-my-firewall/
       - "32400:32400"     # (for access to the Plex Media Server) [required]
@@ -244,7 +247,7 @@ services:
       WATCHTOWER_NOTIFICATIONS_LEVEL: info
       WATCHTOWER_SCHEDULE: 0 0 4 * * *
       WATCHTOWER_TIMEOUT: 10s
-    hostname: cineplex
+    hostname: watchtower
     image: ghcr.io/containrrr/watchtower
     restart: unless-stopped
     volumes:
