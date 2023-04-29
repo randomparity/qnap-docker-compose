@@ -1,94 +1,308 @@
-version: "2.1"
+version: "3.9"
+
+########################### NETWORKS
+# There is no need to create any networks outside this docker-compose file.
+# You may customize the network subnets (192.168.90.0/24 and 91.0/24) below as you please.
+# Docker Compose version 3.5 or higher required to define networks this way.
+networks:
+  t2_proxy:
+    name: t2_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.90.0/24
+  default:
+    driver: bridge
+
+########################### SECRETS
+secrets:
+  htpasswd:
+    file: $SECRETS_DIR/htpasswd
+  cf_email:
+    file: $SECRETS_DIR/cf_email
+  cf_api_key:
+    file: $SECRETS_DIR/cf_api_key
+  cf_token:
+    file: $SECRETS_DIR/cf_token
+  traefik_forward_auth:
+    file: $SECRETS_DIR/traefik_forward_auth
+  mysql_root_password:
+    file: $SECRETS_DIR/mysql_root_password
+  authelia_jwt_secret:
+    file: $SECRETS_DIR/authelia_jwt_secret
+  authelia_session_secret:
+    file: $SECRETS_DIR/authelia_session_secret
+  authelia_storage_mysql_password:
+    file: $SECRETS_DIR/authelia_storage_mysql_password
+  authelia_notifier_smtp_password:
+    file: $SECRETS_DIR/authelia_notifier_smtp_password
+  authelia_duo_api_secret_key:
+    file: $SECRETS_DIR/authelia_duo_api_secret_key
+  authelia_storage_encryption_key:
+    file: $SECRETS_DIR/authelia_storage_encryption_key
+  guac_db_name:
+    file: $SECRETS_DIR/guac_db_name
+  guac_mysql_user:
+    file: $SECRETS_DIR/guac_mysql_user
+  guac_mysql_password:
+    file: $SECRETS_DIR/guac_mysql_password
+  plex_claim:
+    file: $SECRETS_DIR/plex_claim
+  #traefik_hub_agent_token:
+  #  file: $SECRETS_DIR/traefik_hub_agent_token
+
+########################### EXTENSION FIELDS
+# Helps eliminate repetition of sections
+# More Info on how to use this: https://github.com/htpcBeginner/docker-traefik/pull/228
+
+# Common environment values
+x-environment: &default-tz-puid-pgid
+  TZ: $TZ
+  PUID: $PUID
+  PGID: $PGID
+
+# Keys common to some of the services in basic-services.txt
+x-common-keys-core: &common-keys-core
+  networks:
+    - t2_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: always
+  # profiles:
+  # - core
+
+# Keys common to some of the services in basic-services.txt
+x-common-keys-monitoring: &common-keys-monitoring
+  networks:
+    - t2_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: always
+  # profiles:
+  # - monitoring
+
+# Keys common to some of the dependent services/apps
+x-common-keys-apps: &common-keys-apps
+  networks:
+    - t2_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+  # profiles:
+  # - apps
+
+# Keys common to some of the services in media-services.txt
+x-common-keys-media: &common-keys-media
+  networks:
+    - t2_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: "no"
+  # profiles:
+  # - media
+
+########################### SERVICES
 services:
-  # Needs changes to your DHCP server to work correctly.
-  # See https://hub.docker.com/r/linuxserver/netbootxyz
-  netbootxyz:
-    container_name: netbootxyz
+  ############################# BASE
+  cloudddns:
+    container_name: cloudddns
+    restart: always
+    image: joshava/cloudflare-ddns
+    volumes:
+    # DRC - ToDO: Review placement of git source directory from $USER_DIR
+      - $DOCKER_DIR/cloudflare-ddns/config.yaml:/app/config.yaml
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
-    hostname: netbootxyz
-    image: lscr.io/linuxserver/netbootxyz:latest
-    ports:
-      - 69:69/udp
-      - 3000:3000
-    restart: unless-stopped
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /share/Container/netbootxyz:/config
+      <<: *default-tz-puid-pgid
 
-  tautulli:
-    container_name: tautulli
+  ############################# FRONTENDS
+  # Traefik 2 - Reverse Proxy
+  # DRC - ToDo: Create script to generate these files and others??
+  # Touch (create empty files) traefik.log and acme/acme.json. Set acme.json permissions to 600.
+  # touch $DOCKEDIR/appdata/traefik2/acme/acme.json
+  # chmod 600 $DOCKER_DIR/appdata/traefik2/acme/acme.json
+  # touch $DOCKER_DIR/logs/cloudserver/traefik.log
+  # touch $DOCKER_DIR/logs/cloudserver/access.log
+
+  traefik:
+    command: # CLI arguments
+      - --global.checkNewVersion=true
+      - --global.sendAnonymousUsage=true
+      - --entryPoints.http.address=:80
+      - --entryPoints.https.address=:443
+      # Allow these IPs to set the X-Forwarded-* headers - Cloudflare IPs: https://www.cloudflare.com/ips/
+      - --entrypoints.https.forwardedHeaders.trustedIPs=$CLOUDFLARE_IPS,$LOCAL_IPS
+      - --entryPoints.traefik.address=:8080
+      # - --entryPoints.ping.address=:8081
+      - --api=true
+      # - --api.insecure=true
+      - --api.dashboard=true
+      #- --ping=true
+      # - --serversTransport.insecureSkipVerify=true
+      - --log=true
+      - --log.filePath=/logs/traefik.log
+      - --log.level=DEBUG # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+      - --accessLog=true
+      - --accessLog.filePath=/logs/access.log
+      - --accessLog.bufferingSize=100 # Configuring a buffer of 100 lines
+      - --accessLog.filters.statusCodes=204-299,400-499,500-599
+      - --providers.docker=true
+      # Dissble if using Docker Socket Proxy
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
+      # Use Docker Socket Proxy instead for improved security
+      #- --providers.docker.endpoint=tcp://socket-proxy:2375
+      # Automatically set Host rule for services
+      # - --providers.docker.defaultrule=Host(`{{ index .Labels "com.docker.compose.service" }}.$DOMAINNAME_CLOUD_SERVER`)
+      - --providers.docker.exposedByDefault=false
+      # - --entrypoints.https.http.middlewares=chain-oauth@file
+      - --entrypoints.https.http.tls.options=tls-opts@file
+      # Add dns-cloudflare as default certresolver for all services. Also enables TLS and no need to specify on individual services
+      - --entrypoints.https.http.tls.certresolver=dns-cloudflare
+      - --entrypoints.https.http.tls.domains[0].main=$DOMAINNAME_CLOUD_SERVER
+      - --entrypoints.https.http.tls.domains[0].sans=*.$DOMAINNAME_CLOUD_SERVER
+      # - --entrypoints.https.http.tls.domains[1].main=$DOMAINNAME2 # Pulls main cert for second domain
+      # - --entrypoints.https.http.tls.domains[1].sans=*.$DOMAINNAME2 # Pulls wildcard cert for second domain
+      - --providers.docker.network=t2_proxy
+      - --providers.docker.swarmMode=false
+      - --providers.file.directory=/rules # Load dynamic configuration from one or more .toml or .yml files in a directory
+      # - --providers.file.filename=/path/to/file # Load dynamic configuration from a file
+      - --providers.file.watch=true # Only works on top level files in the rules folder
+      # - --certificatesResolvers.dns-cloudflare.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory # LetsEncrypt Staging Server - uncomment when testing
+      - --certificatesResolvers.dns-cloudflare.acme.email=$CLOUDFLARE_EMAIL
+      - --certificatesResolvers.dns-cloudflare.acme.storage=/acme.json
+      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.provider=cloudflare
+      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.delayBeforeCheck=90 # To delay DNS check and reduce LE hitrate
+      # - --metrics.prometheus=true
+      # - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
+    container_name: traefik
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
-    hostname: tautulli
-    image: lscr.io/linuxserver/tautulli
+      - TZ=$TZ
+      - CF_API_EMAIL_FILE=/run/secrets/cf_email
+      - CF_API_KEY_FILE=/run/secrets/cf_api_key
+      - HTPASSWD_FILE=/run/secrets/htpasswd # HTPASSWD_FILE can be whatever as it is not used/called anywhere.
+      # DRC - ToDo: What does this do?  Is it required?
+      - DOMAINNAME_CLOUD_SERVER # Passing the domain name to traefik container to be able to use the variable in rules.
+    image: traefik:2.9
+    labels:
+      #- "autoheal=true"
+      - "traefik.enable=true"
+      # HTTP-to-HTTPS Redirect
+      - "traefik.http.routers.http-catchall.entrypoints=http"
+      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      # HTTP Routers
+      - "traefik.http.routers.traefik-rtr.entrypoints=https"
+      - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.$DOMAINNAME_CLOUD_SERVER`)"
+      - "traefik.http.routers.traefik-rtr.tls=true" # Some people had 404s without this
+      # - "traefik.http.routers.traefik-rtr.tls.certresolver=dns-cloudflare" # Comment out this line after first run of traefik to force the use of wildcard certs
+      - "traefik.http.routers.traefik-rtr.tls.domains[0].main=$DOMAINNAME_CLOUD_SERVER"
+      - "traefik.http.routers.traefik-rtr.tls.domains[0].sans=*.$DOMAINNAME_CLOUD_SERVER"
+      # - "traefik.http.routers.traefik-rtr.tls.domains[1].main=$DOMAINNAME2" # Pulls main cert for second domain
+      # - "traefik.http.routers.traefik-rtr.tls.domains[1].sans=*.$DOMAINNAME2" # Pulls wildcard cert for second domain
+      ## Services - API
+      - "traefik.http.routers.traefik-rtr.service=api@internal"
+      ## Healthcheck/ping
+      #- "traefik.http.routers.ping.rule=Host(`traefik.$DOMAINNAME_CLOUD_SERVER`) && Path(`/ping`)"
+      #- "traefik.http.routers.ping.tls=true"
+      #- "traefik.http.routers.ping.service=ping@internal"
+      ## Middlewares
+      #- "traefik.http.routers.traefik-rtr.middlewares=chain-no-auth@file" # For No Authentication
+      - "traefik.http.routers.traefik-rtr.middlewares=chain-basic-auth@file" # For Basic HTTP Authentication
+      #- "traefik.http.routers.traefik-rtr.middlewares=chain-oauth@file" # For Google OAuth
+      #- "traefik.http.routers.traefik-rtr.middlewares=chain-authelia@file" # For Authelia Authentication
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.254 # Traefik
+      #socket_proxy:
     ports:
-      - "8181:8181"
-    restart: unless-stopped
+      # DRC - ToDo: Consider environment variable, allowing these to be moved
+      - "$TRAEFIK_HTTP_PORT:80"
+      - "$TRAEFIK_HTTPS_PORT:443"
+    restart: always
+    secrets:
+      - cf_email
+      - cf_api_key
+      - htpasswd
+    security_opt:
+      - no-new-privileges:true
+    #healthcheck:
+    #  test: ["CMD", "traefik", "healthcheck", "--ping"]
+    #  interval: 5s
+    #  retries: 3
     volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /share/Container/tautulli:/config
-      - /share/Backup/tautulli:/config/backups
-      - /share/Container/plex/Library/Application Support/Plex Media Server/Logs:/logs
+      - $APPDATA_DIR/traefik2/rules/cloudserver:/rules # file provider directory
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Use Docker Socket Proxy instead for improved security
+      - $APPDATA_DIR/traefik2/acme/acme.json:/acme.json # cert location - you must create this emtpy file and change permissions to 600
+      - $DOCKER_DIR/logs/cloudserver/traefik:/logs # for fail2ban or crowdsec
 
-  channels-dvr:
-    container_name: channels-dvr
-    devices:
-      - /dev/dri:/dev/dri
-    hostname: channels-dvr
-    image: fancybits/channels-dvr:latest
-    # By using bridge networking we give up mDNS
-    # network_mode: host
-    ports:
-      # Channels-DVR enables mDNS by default so that client apps can find
-      # the server automagically.  We're specifically disabling Zeroconf
-      # so all clients need to manually set an IP address to access the 
-      # server.
-      # - "5353:5353/udp" # (Bonjour/Avahi/Zeroconf network discovery)
-      - "8089:8089"
-    restart: unless-stopped
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /share/Container/channels-dvr:/channels-dvr
-      - /share/Media/video:/shares/DVR
-      - /share/Media/movies:/shares/movies:ro
-      - /share/Media/series:/shares/series:ro
+  # Google OAuth - Single Sign On using OAuth 2.0
+  # https://www.smarthomebeginner.com/google-oauth-with-traefik-docker/
+  oauth:
+    container_name: oauth
+    environment:
+      - CONFIG=/config
+      - COOKIE_DOMAIN=$DOMAINNAME_CLOUD_SERVER
+      - INSECURE_COOKIE=false
+      - AUTH_HOST=oauth.$DOMAINNAME_CLOUD_SERVER
+      - URL_PATH=/_oauth
+      - LOG_LEVEL=warn # set to trace while testing bypass rules, otherwise warn
+      - LOG_FORMAT=text
+      - LIFETIME=86400 # 1 day
+      - DEFAULT_ACTION=auth
+      - DEFAULT_PROVIDER=google
+    image: thomseddon/traefik-forward-auth:latest
+    # Allow apps to bypass OAuth. Radarr example below will bypass OAuth if API key is present in the request (eg. from NZB360 mobile app).
+    # While this is one way, the recommended way is to bypass authentication using Traefik labels shown in some of the -Arr apps in this file.
+    # command: --rule.radarr.action=allow --rule.radarr.rule="Headers(`X-Api-Key`, `$RADARR_API_KEY`)"
+    # command: --rule.sabnzbd.action=allow --rule.sabnzbd.rule="HeadersRegexp(`X-Forwarded-Uri`, `$SABNZBD_API_KEY`)"
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.oauth-rtr.tls=true"
+      - "traefik.http.routers.oauth-rtr.entrypoints=https"
+      - "traefik.http.routers.oauth-rtr.rule=Host(`oauth.$DOMAINNAME_CLOUD_SERVER`)"
+      ## Middlewares
+      - "traefik.http.routers.oauth-rtr.middlewares=chain-oauth@file"
+      ## HTTP Services
+      - "traefik.http.routers.oauth-rtr.service=oauth-svc"
+      - "traefik.http.services.oauth-svc.loadbalancer.server.port=4181"
+    networks:
+      - t2_proxy
+    secrets:
+      - source: traefik_forward_auth
+        target: /config
+    restart: always
+    security_opt:
+      - no-new-privileges:true
 
+  ############################# INDEXERS
   prowlarr:
     container_name: prowlarr
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
+      <<: *default-tz-puid-pgid
     hostname: prowlarr
     image: lscr.io/linuxserver/prowlarr
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.prowlarr-rtr.entrypoints=https"
+      - "traefik.http.routers.prowlarr-rtr.rule=Host(`prowlarr.$DOMAINNAME_CLOUD_SERVER`)"
+      ## Middlewares
+      # - "traefik.http.routers.prowlarr-rtr-bypass.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.prowlarr-rtr.middlewares=chain-oauth@file"
+      ## HTTP Services
+      - "traefik.http.routers.prowlarr-rtr.service=prowlarr-svc"
+      - "traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696"
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.162 # prowlarr
     ports:
-      - 9696:9696
+      - "$PROWLARR_PORT:9696"
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Container/prowlarr:/config
-
-  makemkv:
-    container_name: makemkv
-    environment:
-      - USER_ID=1000
-      - GROUP_ID=1001
-      - TZ=America/Los_Angeles
-    hostname: makemkv
-    image: jlesage/makemkv
-    ports:
-      - 5800:5800
-    restart: unless-stopped
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /share/Container/makemkv:/config
-      - /share/Media:/media
-      - /share/Download/sabnzbd/completed:/download
+      - $APPDATA_DIR/prowlarr:/config
 
 #  recyclarr:
 #    container_name: recyclarr
@@ -103,114 +317,196 @@ services:
 #    - /etc/localtime:/etc/localtime:ro
 #    - /share/Container/recyclarr:/config
 
+  ############################# DOWNLOADERS
   sabnzbd:
     container_name: sabnzbd
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
+      PUID: $PUID
+      PGID: $PGID
+      TZ: $TZ
+      UMASK_SET: 002
     hostname: sabnzbd
     image: lscr.io/linuxserver/sabnzbd
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers Auth Bypass
+      - "traefik.http.routers.sabnzbd-rtr-bypass.entrypoints=https"
+      - "traefik.http.routers.sabnzbd-rtr-bypass.rule=Host(`sabnzbd.$DOMAINNAME_CLOUD_SERVER`) && Query(`apikey`, `$SABNZBD_API_KEY`)"
+      - "traefik.http.routers.sabnzbd-rtr-bypass.priority=100"
+      ## HTTP Routers Auth
+      - "traefik.http.routers.sabnzbd-rtr.entrypoints=https"
+      - "traefik.http.routers.sabnzbd-rtr.rule=Host(`sabnzbd.$DOMAINNAME_CLOUD_SERVER`)"
+      - "traefik.http.routers.sabnzbd-rtr.priority=99"
+      ## Middlewares
+      - "traefik.http.routers.sabnzbd-rtr-bypass.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.sabnzbd-rtr.middlewares=chain-oauth@file"
+      ## HTTP Services
+      - "traefik.http.routers.sabnzbd-rtr.service=sabnzbd-svc"
+      - "traefik.http.routers.sabnzbd-rtr-bypass.service=sabnzbd-svc"
+      - "traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080"
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.116 # sabnzbd
     ports:
-      - 4444:8080
+      - "$SABNZBD_PORT:8080"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Container/sabnzbd:/config
-      - /share/Download/sabnzbd:/download
-      - /share/Backup/sabnzbd:/backup
+      - $APPDATA_DIR/sabnzbd:/config
+      - $BACKUP_DIR/sabnzbd:/backup
+      - $DOWNLOAD_DIR/sabnzbd:/download
 
+  ############################# PVRS
   radarr:
     container_name: radarr
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
+      <<: *default-tz-puid-pgid
     hostname: radarr
     image: lscr.io/linuxserver/radarr
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers Auth Bypass
+      - "traefik.http.routers.radarr-rtr-bypass.entrypoints=https"
+      - "traefik.http.routers.radarr-rtr-bypass.rule=Host(`radarr.$DOMAINNAME_CLOUD_SERVER`) && (Headers(`X-Api-Key`, `$RADARR_API_KEY`) || Query(`apikey`, `$RADARR_API_KEY`))"
+      #- "traefik.http.routers.radarr-rtr-bypass.rule=Headers(`traefik-auth-bypass-key`, `$TRAEFIK_AUTH_BYPASS_KEY`)" # Bypass Auth for LunaSea on iOS
+      - "traefik.http.routers.radarr-rtr-bypass.priority=100"
+      ## HTTP Routers Auth
+      - "traefik.http.routers.radarr-rtr.entrypoints=https"
+      - "traefik.http.routers.radarr-rtr.rule=Host(`radarr.$DOMAINNAME_CLOUD_SERVER`)"
+      - "traefik.http.routers.radarr-rtr.priority=99"
+      ## Middlewares
+      - "traefik.http.routers.radarr-rtr-bypass.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.radarr-rtr.middlewares=chain-oauth@file"
+      ## HTTP Services
+      - "traefik.http.routers.radarr-rtr.service=radarr-svc"
+      - "traefik.http.routers.radarr-rtr-bypass.service=radarr-svc"
+      - "traefik.http.services.radarr-svc.loadbalancer.server.port=7878"
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.164 # radarr
     ports:
-      - 7878:7878
+      - "$RADARR_PORT:7878"
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Backup/radarr:/backup
-      - /share/Container/radarr:/config
-      - /share/Container/assets/radarr:/config/MediaCover
-      - /share/Media/movies:/movies
-      - /share/Download/sabnzbd:/download
+      - $APPDATA_DIR/radarr:/config
+      - $ASSETS_DIR/radarr:/config/MediaCover
+      - $BACKUP_DIR/radarr:/backup
+      - $DOWNLOAD_DIR/sabnzbd:/download
+      - $MOVIE_DIR:/movies
 
   sonarr:
     container_name: sonarr
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
+      <<: *default-tz-puid-pgid
     hostname: sonarr
     image: lscr.io/linuxserver/sonarr
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers Auth Bypass
+      - "traefik.http.routers.sonarr-rtr-bypass.entrypoints=https"
+      - "traefik.http.routers.sonarr-rtr-bypass.rule=Host(`sonarr.$DOMAINNAME_CLOUD_SERVER`) && (Headers(`X-Api-Key`, `$SONARR_API_KEY`) || Query(`apikey`, `$SONARR_API_KEY`))"
+      #- "traefik.http.routers.sonarr-rtr-bypass.rule=Headers(`traefik-auth-bypass-key`, `$TRAEFIK_AUTH_BYPASS_KEY`)" # Bypass Auth for LunaSea on iOS
+      - "traefik.http.routers.sonarr-rtr-bypass.priority=100"
+      ## HTTP Routers Auth
+      - "traefik.http.routers.sonarr-rtr.entrypoints=https"
+      - "traefik.http.routers.sonarr-rtr.rule=Host(`sonarr.$DOMAINNAME_CLOUD_SERVER`)"
+      - "traefik.http.routers.sonarr-rtr.priority=99"
+      ## Middlewares
+      - "traefik.http.routers.sonarr-rtr-bypass.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.sonarr-rtr.middlewares=chain-oauth@file"
+      ## HTTP Services
+      - "traefik.http.routers.sonarr-rtr.service=sonarr-svc"
+      - "traefik.http.routers.sonarr-rtr-bypass.service=sonarr-svc"
+      - "traefik.http.services.sonarr-svc.loadbalancer.server.port=8989"
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.167 # sonarr
     ports:
-      - 8989:8989
+      - "$SONARR_PORT:8989"
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Backup/sonarr:/backup
-      - /share/Container/sonarr:/config
-      - /share/Container/assets/sonarr:/config/MediaCover
-      - /share/Media/series:/series
-      - /share/Download/sabnzbd:/download
+      - $APPDATA_DIR/sonarr:/config
+      - $ASSETS_DIR/sonarr:/config/MediaCover
+      - $BACKUP_DIR/sonarr:/backup
+      - $DOWNLOAD_DIR/sabnzbd:/download
+      - $SERIES_DIR:/series
 
   lidarr:
     container_name: lidarr
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
+      <<: *default-tz-puid-pgid
     hostname: lidarr
     image: lscr.io/linuxserver/lidarr
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers Auth Bypass
+      - "traefik.http.routers.lidarr-rtr-bypass.entrypoints=https"
+      - "traefik.http.routers.lidarr-rtr-bypass.rule=Host(`lidarr.$DOMAINNAME_CLOUD_SERVER`) && (Headers(`X-Api-Key`, `$LIDARR_API_KEY`) || Query(`apikey`, `$LIDARR_API_KEY`))"
+      #- "traefik.http.routers.lidarr-rtr-bypass.rule=Headers(`traefik-auth-bypass-key`, `$TRAEFIK_AUTH_BYPASS_KEY`)" # Bypass Auth for LunaSea on iOS
+      - "traefik.http.routers.lidarr-rtr-bypass.priority=100"
+      ## HTTP Routers Auth
+      - "traefik.http.routers.lidarr-rtr.entrypoints=https"
+      - "traefik.http.routers.lidarr-rtr.rule=Host(`lidarr.$DOMAINNAME_CLOUD_SERVER`)"
+      - "traefik.http.routers.lidarr-rtr.priority=99"
+      ## Middlewares
+      - "traefik.http.routers.lidarr-rtr-bypass.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.lidarr-rtr.middlewares=chain-oauth@file"
+      ## HTTP Services
+      - "traefik.http.routers.lidarr-rtr.service=lidarr-svc"
+      - "traefik.http.routers.lidarr-rtr-bypass.service=lidarr-svc"
+      - "traefik.http.services.lidarr-svc.loadbalancer.server.port=8686"
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.163 # lidarr
     ports:
-      - 8686:8686
+      - "$LIDARR_PORT:8686"
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Backup/lidarr:/backup
-      - /share/Container/lidarr:/config
-      - /share/Container/assets/lidarr:/config/MediaCover
-      - /share/Media/music:/music
-      - /share/Download/sabnzbd:/download
+      - $APPDATA_DIR/lidarr:/config
+      - $ASSETS_DIR/lidarr:/config/MediaCover
+      - $BACKUP_DIR/lidarr:/backup
+      - $DOWNLOAD_DIR/sabnzbd:/download
+      - $MUSIC_DIR:/music
 
-  portainer:
-    command:
-      - -H
-      - unix:///var/run/docker.sock
-    container_name: portainer
-    environment:
-      - TZ=America/Los_Angeles
-    hostname: portainer
-    image: portainer/portainer-ce
-    ports:
-      - 8000:8000
-      - 9000:9000
-    restart: unless-stopped
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /share/Container/portainer:/config
-      - /var/run/docker.sock:/var/run/docker.sock
-
-  plex:
+  ############################# MEDIA
+  plexms:
     # https://hub.docker.com/r/plexinc/pms-docker/
     # How to claim the Plex server using SSH port forwarding:
     # ssh user@nas -L 32400:127.0.0.1:32400 -N
     # http://localhost:32400/web
-    container_name: plex
+    container_name: plexms
     devices:
       - /dev/dri:/dev/dri
     environment:
-      - PUID=1001
-      - PGID=1000
-      - TZ=America/Los_Angeles
-      - VERSION=docker
-      - ADVERTISE_IP='http://192.168.2.3:32400'
+      TZ: $TZ
+      PUID: $PUID
+      PGID: $PGID
+      HOSTNAME: "Cineplex"
+      PLEX_CLAIM_FILE: /run/secrets/plex_claim
+      # DRC - ToDo: What is Zerotier??
+      # ADVERTISE_IP: "http://$SERVER_IP:32400/,http://$ZEROTIER_IP_CLOUDSERVER:32400/,https://plex.$DOMAINNAME_CLOUD_SERVER"
+      ADVERTISE_IP: "http://$SERVER_IP:32400/,https://plex.$DOMAINNAME_CLOUD_SERVER"
+      VERSION: docker
     hostname: plex
     image: lscr.io/linuxserver/plex
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.plexms-rtr.entrypoints=https"
+      - "traefik.http.routers.plexms-rtr.rule=Host(`plex.$DOMAINNAME_CLOUD_SERVER`)"
+      ## Middlewares
+      - "traefik.http.routers.plexms-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Servicesnoauth
+      - "traefik.http.routers.plexms-rtr.service=plexms-svc"
+      - "traefik.http.services.plexms-svc.loadbalancer.server.port=32400"
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.100 # plexms
     ports:
       # Plex is being used in a bridged networking configurarion, need
       # to specifically advertise ports for use
@@ -226,21 +522,91 @@ services:
       - "32414:32414/udp" # (current GDM network discovery)
       # - "32469:32469"   # (access to the Plex DLNA Server)
     restart: unless-stopped
+    secrets:
+      - plex_claim
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Backup/plex:/backup
-      - /share/Container/plex:/config
       # Move bulky metadata into separate directories to reduce backup size
-      - /share/Container/assets/plex-cache:/config/Library/Application Support/Plex Media Server/Cache
-      - /share/Container/assets/plex-metadata:/config/Library/Application Support/Plex Media Server/Metadata
-      - /share/Container/assets/plex-media:/config/Library/Application Support/Plex Media Server/Media
+      - $ASSETS_DIR/plex-cache:/config/Library/Application Support/Plex Media Server/Cache
+      - $ASSETS_DIR/plex-metadata:/config/Library/Application Support/Plex Media Server/Metadata
+      - $ASSETS_DIR/plex-media:/config/Library/Application Support/Plex Media Server/Media
+      - $BACKUP_DIR/plex:/backup
+      - $APPDATA_DIR/plex:/config
       # Note the read-only attribute below, Plex can't write "Optimized" versions
       # of a file to the same directory
-      - /share/Media/movies:/movies:ro
-      - /share/Media/music:/music:ro
-      - /share/Media/series:/series:ro
-      - /share/Media/video:/video:ro
+      - $MOVIE_DIR:/movies:ro
+      - $MUSIC_DIR:/music:ro
+      - $SERIES_DIR:/series:ro
+      - $VIDEO_DIR:/video:ro
 
+  tautulli:
+    container_name: tautulli
+    environment:
+      <<: *default-tz-puid-pgid
+    hostname: tautulli
+    image: lscr.io/linuxserver/tautulli
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers Auth Bypass
+      - "traefik.http.routers.tautulli-rtr-bypass.entrypoints=https"
+      - "traefik.http.routers.tautulli-rtr-bypass.rule=Host(`tautulli.$DOMAINNAME_CLOUD_SERVER`) && (Headers(`X-Api-Key`, `$TAUTULLI_API_KEY`) || Query(`apikey`, `$TAUTULLI_API_KEY`))"
+      #- "traefik.http.routers.tautulli-rtr-bypass.rule=Headers(`traefik-auth-bypass-key`, `$TRAEFIK_AUTH_BYPASS_KEY`)" # Bypass Auth for LunaSea on iOS
+      - "traefik.http.routers.tautulli-rtr-bypass.priority=100"
+      ## HTTP Routers
+      - "traefik.http.routers.tautulli-rtr.entrypoints=https"
+      - "traefik.http.routers.tautulli-rtr.rule=Host(`tautulli.$DOMAINNAME_CLOUD_SERVER`)"
+      - "traefik.http.routers.tautulli-rtr.priority=99"
+      ## Middlewares
+      - "traefik.http.routers.tautulli-rtr-bypass.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.tautulli-rtr.middlewares=chain-oauth@file"
+      ## HTTP Services
+      - "traefik.http.routers.tautulli-rtr.service=tautulli-svc"
+      - "traefik.http.routers.tautulli-rtr-bypass.service=tautulli-svc"
+      - "traefik.http.services.tautulli-svc.loadbalancer.server.port=8181"
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.101 # tautulli
+    ports:
+      - "$TAUTULLI_PORT:8181"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - $APPDATA_DIR/tautulli:/config
+      - $APPDATA_DIR/plex/Library/Application Support/Plex Media Server/Logs:/logs
+      - $BACKUP_DIR/tautulli:/config/backups
+
+  channels-dvr:
+    container_name: channels-dvr
+    devices:
+      - /dev/dri:/dev/dri
+    hostname: channels-dvr
+    image: fancybits/channels-dvr:latest
+    # By using bridge networking we give up mDNS and Zeroconf
+    # network_mode: host
+    networks:
+      - default
+    ports:
+      # Channels-DVR enables mDNS by default so that client apps can find
+      # the server automagically.  We're specifically disabling Zeroconf
+      # so all clients need to manually set an IP address to access the 
+      # server.
+      # - "5353:5353/udp" # (Bonjour/Avahi/Zeroconf network discovery)
+      - "$CHANNELS_PORT:8089"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - $APPDATA_DIR/channels-dvr:/channels-dvr
+      - $MOVIE_DIR:/shares/movies:ro
+      - $SERIES_DIR:/shares/series:ro
+      - $VIDEO_DIR:/shares/DVR
+
+  ############################# MISCELLANEOUS
   tdarr:
     container_name: tdarr
     devices:
@@ -249,8 +615,9 @@ services:
       - PUID=1001
       - PGID=1000
       - TZ=America/Los_Angeles
-      # - UMASK_SET=002
+      - UMASK_SET=002
       - serverIP=tdarr
+    # ToDo: Use setting from .env
       - serverPort=8266
       - webUIPort=8265
       - internalNode=true
@@ -258,21 +625,25 @@ services:
       - nodeName=Cineplex
     hostname: tdarr
     image: ghcr.io/haveagitgat/tdarr:latest
+    networks:
+      - default
     ports:
-      - 8265:8265 # webUI port
-      - 8266:8266 # server port
-      - 8267:8267 # Internal node port
+      - "$TDARR_WEBUI_PORT:8265"
+      - "$TDARR_SERVER_PORT:8266"
+      - "$TDARR_NODE_PORT:8267"
       # - 8268:8268 # Example extra node port
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /share/Backup/tdarr:/backup
-      - /share/Container/tdarr/config:/app/configs
-      - /share/Container/tdarr/server:/app/server
-      - /share/Container/tdarr/logs:/app/logs
-      - /share/Media/movies:/movies
-      - /share/Media/series:/series
-      - /share/Download/tdarr:/temp
+      - $APPDATA_DIR/tdarr/config:/app/configs
+      - $APPDATA_DIR/tdarr/server:/app/server
+      - $APPDATA_DIR/tdarr/logs:/app/logs
+      - $BACKUP_DIR/tdarr:/backup
+      - $DOWNLOAD_DIR/tdarr:/temp
+      - $MOVIE_DIR:/movies
+      - $SERIES_DIR:/series
 
 #  tdarr-node:
 #    container_name: tdarr-node
@@ -290,9 +661,68 @@ services:
 #    restart: unless-stopped
 #    volumes:
 #      - /etc/localtime:/etc/localtime:ro
-#      - /share/Media/movies:/movies
-#      - /share/Media/series:/series
+#      - $MOVIE_DIR:/movies
+#      - $SERIES_DIR:/series
 #      - /share/Download/tdarr/cache:/temp
+
+  makemkv:
+    container_name: makemkv
+    environment:
+      <<: *default-tz-puid-pgid
+    hostname: makemkv
+    image: jlesage/makemkv
+    networks:
+      - default
+    ports:
+      - 5800:5800
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - $APPDATA_DIR/makemkv:/config
+      - $DOWNLOAD_DIR/sabnzbd/completed:/download
+      - $MOVIE_DIR:/media/movies
+      - $MUSIC_DIR:/media/music
+      - $SERIES_DIR:/media/series
+      - $VIDEO_DIR:/media/video
+
+  # Needs changes to your DHCP server to work correctly.
+  # See https://hub.docker.com/r/linuxserver/netbootxyz
+  netbootxyz:
+    container_name: netbootxyz
+    environment:
+      <<: *default-tz-puid-pgid
+    hostname: netbootxyz
+    image: lscr.io/linuxserver/netbootxyz:latest
+    networks:
+      - default
+    ports:
+      - 69:69/udp
+      - 3000:3000
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - $APPDATA_DIR/netbootxyz:/config
+
+  ############################# DOCKER MAINTENANCE TOOLS
+  portainer:
+    command:
+      - -H
+      - unix:///var/run/docker.sock
+    container_name: portainer
+    environment:
+      - TZ=America/Los_Angeles
+    hostname: portainer
+    image: portainer/portainer-ce
+    ports:
+      - 8000:8000
+      - 9000:9000
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - $APPDATA_DIR/portainer:/config
 
   watchtower:
     container_name: watchtower
@@ -311,6 +741,8 @@ services:
       WATCHTOWER_TIMEOUT: 10s
     hostname: watchtower
     image: ghcr.io/containrrr/watchtower
+    networks:
+      - default
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro

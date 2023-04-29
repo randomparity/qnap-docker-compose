@@ -1,0 +1,17 @@
+http:
+  routers:
+    unifi-rtr:
+      rule: "Host(`unifi.{{env "DOMAINNAME_CLOUD_SERVER"}}`)" # will only work with cloudflare Full SSL (not Strict)
+      entryPoints:
+        - https
+      middlewares:
+        - chain-authelia
+      service: unifi-svc
+      tls:
+        certResolver: dns-cloudflare
+  services:
+    unifi-svc:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - address: "https://192.168.5.254:8443" # or whatever your external host's IP:port is 
