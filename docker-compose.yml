@@ -486,6 +486,7 @@ services:
       TZ: $TZ
       PUID: $PUID
       PGID: $PGID
+      UMASK_SET: 002
       HOSTNAME: "Cineplex"
       PLEX_CLAIM_FILE: /run/secrets/plex_claim
       # DRC - ToDo: What is Zerotier??
@@ -540,6 +541,29 @@ services:
       - $MUSIC_DIR:/music:ro
       - $SERIES_DIR:/series:ro
       - $VIDEO_DIR:/video:ro
+
+  # Plex Meta Manager - Automatic Metadata Manager for Plex
+  plexmm:
+    container_name: plexmm
+    environment:
+      TZ: $TZ
+      PUID: $PUID
+      PGID: $PGID
+      UMASK_SET: 002
+      PMM_CONFIG: /config/config.yml
+      PMM_TIME: 03:00 #optional
+      PMM_RUN: "True" #optional
+      PMM_TEST: "False" #optional
+      PMM_NO_MISSING: "False" #optional
+    hostname: plexmm
+    image: lscr.io/linuxserver/plex-meta-manager:latest
+    networks:
+      - t2_proxy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - $APPDATA_DIR/plexmm:/config
 
   tautulli:
     container_name: tautulli
