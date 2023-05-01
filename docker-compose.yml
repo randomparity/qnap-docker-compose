@@ -474,6 +474,7 @@ services:
       - $MUSIC_DIR:/music
 
   ############################# MEDIA
+  # ToDo: plexms often comes up AFTER plexmm. causing network timeouts in plexmm
   plexms:
     # https://hub.docker.com/r/plexinc/pms-docker/
     # How to claim the Plex server using SSH port forwarding:
