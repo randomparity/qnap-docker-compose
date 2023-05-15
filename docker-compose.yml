@@ -495,11 +495,11 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       # Move bulky metadata into separate directories to reduce backup size
-      - $ASSETS_DIR/plex-cache:/config/Library/Application Support/Plex Media Server/Cache
-      - $ASSETS_DIR/plex-metadata:/config/Library/Application Support/Plex Media Server/Metadata
-      - $ASSETS_DIR/plex-media:/config/Library/Application Support/Plex Media Server/Media
+      - $PLEX_ASSETS_DIR/plex-cache:/config/Library/Application Support/Plex Media Server/Cache
+      - $PLEX_ASSETS_DIR/plex-metadata:/config/Library/Application Support/Plex Media Server/Metadata
+      - $PLEX_ASSETS_DIR/plex-media:/config/Library/Application Support/Plex Media Server/Media
       - $BACKUP_DIR/plex:/backup
-      - $APPDATA_DIR/plex:/config
+      - $PLEX_APPDATA_DIR/plex:/config
       # Note the read-only attribute below, Plex can't write "Optimized" versions
       # of a file to the same directory
       - $MOVIE_DIR:/movies:ro
