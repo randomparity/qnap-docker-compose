@@ -439,6 +439,7 @@ services:
 
   ############################# MEDIA
   # ToDo: plexms often comes up AFTER plexmm. causing network timeouts in plexmm
+  # Plex Media Server (https://www.plex.tv/)
   plexms:
     # https://hub.docker.com/r/plexinc/pms-docker/
     # How to claim the Plex server using SSH port forwarding:
@@ -598,6 +599,24 @@ services:
       - $MOVIE_DIR:/shares/movies:ro
       - $SERIES_DIR:/shares/series:ro
       - $VIDEO_DIR:/shares/DVR
+
+  # dizqueTV (fork of PseudoTV)
+  # https://github.com/vexorian/dizquetv
+  dizquetv:
+    container_name: dizquetv
+    hostname: dizquetv
+    image: vexorian/dizquetv:latest
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.102 # dizquetv
+    ports:
+      - 8100:8000
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - $APPDATA_DIR/dizquetv:/home/node/app/.dizquetv
 
   ############################# MISCELLANEOUS
   tdarr:
