@@ -184,9 +184,9 @@ services:
     #  interval: 5s
     #  retries: 3
     volumes:
-      - $APPDATA_DIR/traefik2/rules/cloudserver:/rules # file provider directory
+      - $TRAEFIK2_APPDATA_DIR/rules/cloudserver:/rules # file provider directory
       - /var/run/docker.sock:/var/run/docker.sock:ro # Use Docker Socket Proxy instead for improved security
-      - $APPDATA_DIR/traefik2/acme/acme.json:/acme.json # cert location - you must create this emtpy file and change permissions to 600
+      - $TRAEFIK2_APPDATA_DIR/acme/acme.json:/acme.json # cert location - you must create this emtpy file and change permissions to 600
       - $DOCKER_DIR/logs/cloudserver/traefik:/logs # for fail2ban or crowdsec
 
   # Google OAuth - Single Sign On using OAuth 2.0
@@ -257,7 +257,7 @@ services:
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/prowlarr:/config
+      - $PROWLARR_APPDATA_DIR:/config
 
 #  recyclarr:
 #    container_name: recyclarr
@@ -309,7 +309,7 @@ services:
       - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/sabnzbd:/config
+      - $SABNZBD_APPDATA_DIR:/config
       - $BACKUP_DIR/sabnzbd:/backup
       - $DOWNLOAD_DIR/sabnzbd:/download
 
@@ -349,8 +349,7 @@ services:
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/radarr:/config
-      - $ASSETS_DIR/radarr:/config/MediaCover
+      - $RADARR_APPDATA_DIR:/config
       - $BACKUP_DIR/radarr:/backup
       - $DOWNLOAD_DIR/sabnzbd:/download
       - $MOVIE_DIR:/movies
@@ -390,8 +389,7 @@ services:
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/sonarr:/config
-      - $ASSETS_DIR/sonarr:/config/MediaCover
+      - $SONARR_APPDATA_DIR:/config
       - $BACKUP_DIR/sonarr:/backup
       - $DOWNLOAD_DIR/sabnzbd:/download
       - $SERIES_DIR:/series
@@ -431,8 +429,7 @@ services:
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/lidarr:/config
-      - $ASSETS_DIR/lidarr:/config/MediaCover
+      - $LIDARR_APPDATA_DIR:/config
       - $BACKUP_DIR/lidarr:/backup
       - $DOWNLOAD_DIR/sabnzbd:/download
       - $MUSIC_DIR:/music
@@ -507,7 +504,7 @@ services:
       - $MOVIE_DIR:/movies:ro
       - $MUSIC_DIR:/music:ro
       - $SERIES_DIR:/series:ro
-      - $VIDEO_DIR:/video:ro
+      - $VIDEO_DIR:/videos:ro
 
   # Plex Meta Manager - Automatic Metadata Manager for Plex
   plexmm:
@@ -530,7 +527,8 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - $APPDATA_DIR/plexmm:/config
+      - /etc/localtime:/etc/localtime:ro
+      - $PLEXMM_APPDATA_DIR:/config
 
   tautulli:
     container_name: tautulli
@@ -569,8 +567,8 @@ services:
       - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/tautulli:/config
-      - $APPDATA_DIR/plex/Library/Application Support/Plex Media Server/Logs:/logs
+      - $TAUTULLI_APPDATA_DIR:/config
+      - $PLEX_APPDATA_DIR/plex/Library/Application Support/Plex Media Server/Logs:/logs
       - $BACKUP_DIR/tautulli:/config/backups
 
   channels-dvr:
@@ -588,14 +586,14 @@ services:
       # the server automagically.  We're specifically disabling Zeroconf
       # so all clients need to manually set an IP address to access the 
       # server.
-      # - "5353:5353/udp" # (Bonjour/Avahi/Zeroconf network discovery)
-      - "$CHANNELS_PORT:8089"
+      - "5353:5353/udp" # (Bonjour/Avahi/Zeroconf network discovery)
+      # - "$CHANNELS_PORT:8089"
     restart: always
     security_opt:
       - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/channels-dvr:/channels-dvr
+      - $CHANNELS_APPDATA_DIR:/channels-dvr
       - $MOVIE_DIR:/shares/movies:ro
       - $SERIES_DIR:/shares/series:ro
       - $VIDEO_DIR:/shares/DVR
@@ -616,7 +614,7 @@ services:
       - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/dizquetv:/home/node/app/.dizquetv
+      - $DIZQUETV_APPDATA_DIR:/home/node/app/.dizquetv
 
   ############################# MISCELLANEOUS
   tdarr:
@@ -648,9 +646,9 @@ services:
       - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/tdarr/config:/app/configs
-      - $APPDATA_DIR/tdarr/server:/app/server
-      - $APPDATA_DIR/tdarr/logs:/app/logs
+      - $TDARR_APPDATA_DIR/config:/app/configs
+      - $TDARR_APPDATA_DIR/server:/app/server
+      - $TDARR_APPDATA_DIR/logs:/app/logs
       - $BACKUP_DIR/tdarr/backup:/backup
       - $DOWNLOAD_DIR/tdarr:/temp
       - $MOVIE_DIR:/movies
@@ -693,7 +691,7 @@ services:
       - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/makemkv:/config
+      - $MAKEMKV_APPDATA_DIR:/config
       - $DOWNLOAD_DIR/sabnzbd/completed:/download
       - $MOVIE_DIR:/media/movies
       - $MUSIC_DIR:/media/music
@@ -719,7 +717,7 @@ services:
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - $APPDATA_DIR/netbootxyz:/config
+      - $NETBOOTXYZ_APPDATA_DIR:/config
 
   ############################# DOCKER MAINTENANCE TOOLS
   portainer:
@@ -738,7 +736,8 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - $APPDATA_DIR/portainer:/config
+      # - $APPDATA_DIR/portainer:/config
+      - $PORTAINER_APPDATA_DIR:/config
 
   watchtower:
     container_name: watchtower
