@@ -75,6 +75,9 @@ services:
   # chmod 600 $DOCKER_DIR/appdata/traefik2/acme/acme.json
   # touch $DOCKER_DIR/logs/cloudserver/traefik.log
   # touch $DOCKER_DIR/logs/cloudserver/access.log
+  #
+  # Authelia "Misirected Request" Error on iOS devices:
+  # https://github.com/htpcBeginner/docker-traefik/issues/167
 
   traefik:
     command: # CLI arguments
@@ -147,7 +150,6 @@ services:
       # HTTP Routers
       - "traefik.http.routers.traefik-rtr.entrypoints=https"
       - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.$DOMAINNAME_CLOUD_SERVER`)"
-      - "traefik.http.routers.traefik-rtr.tls=true" # Some people had 404s without this
       # - "traefik.http.routers.traefik-rtr.tls.certresolver=dns-cloudflare" # Comment out this line after first run of traefik to force the use of wildcard certs
       - "traefik.http.routers.traefik-rtr.tls.domains[0].main=$DOMAINNAME_CLOUD_SERVER"
       - "traefik.http.routers.traefik-rtr.tls.domains[0].sans=*.$DOMAINNAME_CLOUD_SERVER"
@@ -212,7 +214,6 @@ services:
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
-      - "traefik.http.routers.oauth-rtr.tls=true"
       - "traefik.http.routers.oauth-rtr.entrypoints=https"
       - "traefik.http.routers.oauth-rtr.rule=Host(`oauth.$DOMAINNAME_CLOUD_SERVER`)"
       ## Middlewares
