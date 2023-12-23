@@ -518,7 +518,7 @@ services:
       - /dev/shm:/transcode
       # Note the read-only attribute below, Plex can't write "Optimized" versions
       # of a file to the same directory
-      - $MOVIE_DIR:/movies:ro
+      - $MOVIE_DIR:/movies:rw
       - $MUSIC_DIR:/music:ro
       - $SERIES_DIR:/series:ro
       - $VIDEO_DIR:/videos:ro
