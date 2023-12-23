@@ -355,6 +355,22 @@ services:
       - $DOWNLOAD_DIR/sabnzbd:/download
       - $MOVIE_DIR:/movies
 
+  maintainerr:
+    container_name: maintainerr
+    environment:
+      TZ: $TZ
+    hostname: maintainerr
+    image: jorenn92/maintainerr:latest
+    networks:
+      t2_proxy:
+        ipv4_address: 192.168.90.168 # maintainerr
+    ports:
+      - $MAINTAINERR_PORT:80
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - $MAINTAINERR_APPDATA_DIR:/config
+
   sonarr:
     container_name: sonarr
     environment:
